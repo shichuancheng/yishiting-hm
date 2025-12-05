@@ -1,4 +1,4 @@
-// 首页 - 选择模式
+// 首页 - 微信风格
 import { router } from '@kit.ArkUI';
 import { CHAT_MODES } from '../constants/Modes';
 import { ChatMode, Advisor } from '../models/ChatModels';
@@ -10,118 +10,118 @@ struct HomePage {
 
   build() {
     Column() {
-      // 标题区域
-      Column() {
-        Row() {
-          Column() {
-            Text('选择你的顾问团')
-              .fontSize(32)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#FFFFFF')
-              .margin({ bottom: 8 })
-
-            Text('不同风格，同样帮你解决问题')
-              .fontSize(16)
-              .fontColor('#B0B0B0')
-              .opacity(0.8)
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-
-          Button('测试')
-            .fontSize(14)
-            .height(36)
-            .backgroundColor('#ff6b6b')
-            .onClick(() => {
-              router.pushUrl({ url: 'pages/NetworkTestPage' });
-            })
-        }
-        .width('100%')
+      // 顶部导航栏
+      Row() {
+        Text('选择顾问')
+          .fontSize(17)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#000000')
       }
       .width('100%')
-      .padding({ top: 60, bottom: 40, left: 20, right: 20 })
+      .height(48)
+      .justifyContent(FlexAlign.Center)
+      .backgroundColor('#EDEDED')
+      .border({ width: { bottom: 0.5 }, color: '#D9D9D9' })
 
-      // 模式选择卡片
+      // 模式列表
       Scroll() {
-        Column({ space: 20 }) {
-          ForEach(this.modes, (mode: ChatMode) => {
-            this.ModeCard(mode)
-          })
+        Column({ space: 0 }) {
+          // 顶部说明
+          Column() {
+            Text('选择适合你的顾问团')
+              .fontSize(13)
+              .fontColor('#888888')
+          }
+          .width('100%')
+          .padding({ left: 16, top: 16, bottom: 8 })
+
+          // 模式卡片列表
+          Column() {
+            ForEach(this.modes, (mode: ChatMode, index: number) => {
+              this.ModeItem(mode, index === this.modes.length - 1)
+            })
+          }
+          .width('100%')
+          .backgroundColor('#FFFFFF')
+          .borderRadius(8)
+          .margin({ left: 12, right: 12 })
 
           // 功能特性
           this.FeaturesSection()
         }
         .width('100%')
-        .padding({ left: 20, right: 20, bottom: 40 })
+        .padding({ bottom: 40 })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)
+      .backgroundColor('#EDEDED')
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#1a1a2e')
+    .backgroundColor('#EDEDED')
   }
 
   @Builder
-  ModeCard(mode: ChatMode) {
+  ModeItem(mode: ChatMode, isLast: boolean) {
     Column() {
-      // 图标和标题
       Row() {
-        Text(mode.icon)
-          .fontSize(48)
-          .margin({ right: 16 })
+        // 图标
+        Column() {
+          Text(mode.icon)
+            .fontSize(36)
+        }
+        .width(56)
+        .height(56)
+        .backgroundColor('#F7F7F7')
+        .borderRadius(8)
+        .justifyContent(FlexAlign.Center)
 
+        // 信息
         Column({ space: 4 }) {
           Text(mode.name)
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#000000')
 
           Text(mode.description)
-            .fontSize(14)
-            .fontColor('#B0B0B0')
+            .fontSize(13)
+            .fontColor('#888888')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+          // 顾问头像行
+          Row({ space: 4 }) {
+            ForEach(mode.advisors.slice(0, 4), (advisor: Advisor) => {
+              Text(advisor.avatar)
+                .fontSize(14)
+            })
+            if (mode.advisors.length > 4) {
+              Text(`+${mode.advisors.length - 4}`)
+                .fontSize(11)
+                .fontColor('#888888')
+            }
+          }
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
+        .margin({ left: 12 })
+
+        // 箭头
+        Text('›')
+          .fontSize(20)
+          .fontColor('#C7C7CC')
       }
       .width('100%')
-      .padding({ bottom: 16 })
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
 
-      // 顾问列表
-      Column({ space: 8 }) {
-        ForEach(mode.advisors, (advisor: Advisor) => {
-          Row() {
-            Text(advisor.avatar)
-              .fontSize(20)
-              .margin({ right: 8 })
-
-            Text(advisor.name)
-              .fontSize(14)
-              .fontColor('#FFFFFF')
-          }
-          .width('100%')
-        })
+      // 分割线
+      if (!isLast) {
+        Divider()
+          .color('#EBEBEB')
+          .margin({ left: 84 })
       }
-      .width('100%')
-      .padding({ top: 12, bottom: 12 })
-      .borderWidth({ top: 1 })
-      .borderColor('rgba(255,255,255,0.1)')
-
-      // 开始按钮
-      Button(mode.id === 'emperor' ? '开始问策' : '开始取经')
-        .width('100%')
-        .height(44)
-        .fontSize(15)
-        .fontWeight(FontWeight.Medium)
-        .backgroundColor(mode.id === 'emperor' ? '#667eea' : '#f5576c')
-        .borderRadius(22)
-        .margin({ top: 8 })
     }
     .width('100%')
-    .padding(24)
-    .backgroundColor('rgba(255,255,255,0.05)')
-    .borderRadius(20)
-    .border({ width: 1, color: 'rgba(255,255,255,0.1)' })
     .onClick(() => {
       interface RouterParams {
         modeId: string;
@@ -142,41 +142,59 @@ struct HomePage {
 
   @Builder
   FeaturesSection() {
-    Column({ space: 16 }) {
-      Row({ space: 16 }) {
-        this.FeatureCard('🎯', '问题拆解', '多角色帮你分析问题本质')
-        this.FeatureCard('💬', '情绪支持', '不只给方案，也给你情绪价值')
-      }
-      .width('100%')
-
+    Column({ space: 0 }) {
+      // 标题
       Column() {
-        this.FeatureCard('✅', '行动清单', '给出可执行的具体建议')
+        Text('功能特点')
+          .fontSize(13)
+          .fontColor('#888888')
       }
       .width('100%')
+      .padding({ left: 16, top: 24, bottom: 8 })
+
+      // 特性列表
+      Column() {
+        this.FeatureItem('🎯', '问题拆解', '多角色帮你分析问题本质', false)
+        this.FeatureItem('💬', '情绪支持', '不只给方案，也给你情绪价值', false)
+        this.FeatureItem('✅', '行动清单', '给出可执行的具体建议', true)
+      }
+      .width('100%')
+      .backgroundColor('#FFFFFF')
+      .borderRadius(8)
+      .margin({ left: 12, right: 12 })
     }
     .width('100%')
-    .margin({ top: 40 })
   }
 
   @Builder
-  FeatureCard(icon: string, title: string, desc: string) {
-    Column({ space: 8 }) {
-      Text(icon)
-        .fontSize(28)
+  FeatureItem(icon: string, title: string, desc: string, isLast: boolean) {
+    Column() {
+      Row() {
+        Text(icon)
+          .fontSize(24)
+          .margin({ right: 12 })
 
-      Text(title)
-        .fontSize(15)
-        .fontWeight(FontWeight.Medium)
-        .fontColor('#FFFFFF')
+        Column({ space: 2 }) {
+          Text(title)
+            .fontSize(15)
+            .fontColor('#000000')
 
-      Text(desc)
-        .fontSize(12)
-        .fontColor('#B0B0B0')
-        .textAlign(TextAlign.Center)
+          Text(desc)
+            .fontSize(13)
+            .fontColor('#888888')
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+
+      if (!isLast) {
+        Divider()
+          .color('#EBEBEB')
+          .margin({ left: 52 })
+      }
     }
-    .layoutWeight(1)
-    .padding(20)
-    .backgroundColor('rgba(255,255,255,0.05)')
-    .borderRadius(16)
+    .width('100%')
   }
 }

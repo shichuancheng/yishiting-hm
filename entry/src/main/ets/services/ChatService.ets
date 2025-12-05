@@ -1,13 +1,17 @@
-// 聊天服务 - 处理 API 请求
+// 聊天服务 - 使用 requestInStream 实现真正的流式输出
 import { http } from '@kit.NetworkKit';
+import { util } from '@kit.ArkTS';
 import { Message, StreamChunk } from '../models/ChatModels';
 import { ApiConfig } from '../config/ApiConfig';
 
 export class ChatService {
   private baseUrl: string = ApiConfig.getBaseUrl();
+  private currentRequest: http.HttpRequest | null = null;
+  private decoder: util.TextDecoder = new util.TextDecoder('utf-8');
 
   /**
    * 发送聊天消息（流式）
+   * 使用 HarmonyOS 的 requestInStream API 实现真正的流式输出
    */
   async sendMessage(
     message: string,
@@ -20,18 +24,17 @@ export class ChatService {
     console.info('=== ChatService.sendMessage 开始 ===');
     console.info('[ChatService] 消息:', message);
     console.info('[ChatService] 模式:', mode);
-    console.info('[ChatService] 历史记录数:', history.length);
     
-    let httpRequest: http.HttpRequest | null = null;
-    let hasCompleted = false;
-    let buffer = '';
+    // 取消之前的请求
+    if (this.currentRequest) {
+      this.currentRequest.destroy();
+      this.currentRequest = null;
+    }
+    
+    // 重置解码器
+    this.decoder = new util.TextDecoder('utf-8');
     
     try {
-      console.info('[ChatService] 创建 HTTP 请求...');
-      httpRequest = http.createHttp();
-      console.info('[ChatService] HTTP 请求创建成功');
-      
-      // 构建请求体
       interface HistoryItem {
         role: string;
         content: string;
@@ -55,82 +58,64 @@ export class ChatService {
       };
 
       const url = `${this.baseUrl}/api/chat/stream`;
-      console.info(`[ChatService] 目标 URL: ${url}`);
-      console.info(`[ChatService] 请求体:`, JSON.stringify(requestBody));
+      console.info('[ChatService] URL:', url);
 
-      // 注册事件监听器
-      console.info('[ChatService] 注册事件监听器...');
-      
-      httpRequest.on('headersReceive', (header) => {
-        console.info('[ChatService] ✅ 收到响应头:', JSON.stringify(header));
-      });
+      this.currentRequest = http.createHttp();
+      const httpRequest = this.currentRequest;
+      let buffer = '';
+      let hasCompleted = false;
 
-      // 处理流式响应
+      // 注册流式数据接收事件
       httpRequest.on('dataReceive', (data: ArrayBuffer) => {
-        console.info('[ChatService] 📥 dataReceive 事件触发！');
-        try {
-          const text = this.arrayBufferToString(data);
-          console.info('[ChatService] 数据块长度:', data.byteLength);
-          console.info('[ChatService] 数据内容:', text.substring(0, 200));
-          
-          // 将新数据追加到缓冲区
-          buffer += text;
-          
-          // 按行处理
-          const lines = buffer.split('\n');
-          // 保留最后一个不完整的行
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.substring(6).trim();
-              if (dataStr === '[DONE]') {
-                if (!hasCompleted) {
-                  hasCompleted = true;
-                  console.info('[ChatService] Stream completed with [DONE]');
-                  onComplete();
-                }
-                return;
+        // 使用 TextDecoder 正确处理 UTF-8 编码，避免中文乱码
+        const text = this.decoder.decodeWithStream(new Uint8Array(data), { stream: true });
+        console.info('[ChatService] 收到数据块:', text.length, '字符');
+        
+        buffer += text;
+        
+        // 按行解析 SSE 数据
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.substring(6).trim();
+            
+            if (dataStr === '[DONE]') {
+              if (!hasCompleted) {
+                hasCompleted = true;
+                console.info('[ChatService] 流式传输完成');
+                onComplete();
               }
-              
-              if (dataStr) {
-                try {
-                  const chunk: StreamChunk = JSON.parse(dataStr);
-                  console.info('[ChatService] Parsed chunk:', JSON.stringify(chunk));
-                  onChunk(chunk);
-                } catch (e) {
-                  console.error('[ChatService] Parse chunk error:', e, 'Data:', dataStr);
-                }
+              continue;
+            }
+            
+            if (dataStr) {
+              try {
+                const chunk: StreamChunk = JSON.parse(dataStr);
+                onChunk(chunk);
+              } catch (e) {
+                console.error('[ChatService] 解析失败:', dataStr);
               }
             }
           }
-        } catch (e) {
-          console.error('[ChatService] DataReceive error:', e);
         }
       });
 
       httpRequest.on('dataEnd', () => {
-        console.info('[ChatService] ✅ dataEnd 事件触发');
+        console.info('[ChatService] dataEnd 事件');
         if (!hasCompleted) {
           hasCompleted = true;
-          console.info('[ChatService] 调用 onComplete');
           onComplete();
         }
-        if (httpRequest) {
-          httpRequest.destroy();
-          console.info('[ChatService] HTTP 请求已销毁');
+        if (this.currentRequest) {
+          this.currentRequest.destroy();
+          this.currentRequest = null;
         }
       });
-      
-      httpRequest.on('dataReceiveProgress', (dataProgress: object) => {
-        console.info('[ChatService] 📊 dataReceiveProgress:', JSON.stringify(dataProgress));
-      });
-      
-      console.info('[ChatService] 事件监听器注册完成');
 
-      // 发送请求
-      console.info('[ChatService] 🚀 发送 HTTP 请求...');
-      const requestPromise = httpRequest.request(
+      // 使用 requestInStream 发起流式请求
+      httpRequest.requestInStream(
         url,
         {
           method: http.RequestMethod.POST,
@@ -139,120 +124,60 @@ export class ChatService {
             'Accept': 'text/event-stream'
           },
           extraData: JSON.stringify(requestBody),
-          expectDataType: http.HttpDataType.STRING,
           connectTimeout: ApiConfig.TIMEOUT.CONNECT,
           readTimeout: ApiConfig.TIMEOUT.READ
         },
-        (err, data) => {
+        (err, responseCode) => {
           if (err) {
-            console.error('[ChatService] ❌ 请求错误');
-            console.error('[ChatService] 错误对象:', JSON.stringify(err));
-            console.error('[ChatService] 错误码:', err.code);
-            console.error('[ChatService] 错误信息:', err.message);
+            console.error('[ChatService] 请求错误:', err);
             if (!hasCompleted) {
               hasCompleted = true;
-              // 提供更友好的错误信息
-              let errorMsg = '网络请求失败';
-              if (err.code === 2300003) {
-                errorMsg = '无法连接到服务器，请检查：\n1. 后端服务是否启动\n2. 网络配置是否正确\n3. 模拟器使用 10.0.2.2，真机使用电脑IP';
-              } else if (err.message) {
-                errorMsg = err.message;
-              }
-              onError(errorMsg);
+              onError('网络请求失败: ' + (err.message || '未知错误'));
             }
-            if (httpRequest) {
-              httpRequest.destroy();
+            if (this.currentRequest) {
+              this.currentRequest.destroy();
+              this.currentRequest = null;
             }
             return;
           }
           
-          console.info('[ChatService] ✅ 收到响应，状态码:', data.responseCode);
+          console.info('[ChatService] 响应状态码:', responseCode);
           
-          // 检查响应状态
-          if (data && data.responseCode !== 200) {
-            console.error('[ChatService] ❌ 响应错误，状态码:', data.responseCode);
-            console.error('[ChatService] 响应内容:', data.result);
+          if (responseCode !== 200) {
             if (!hasCompleted) {
               hasCompleted = true;
-              onError(`服务器错误: ${data.responseCode}`);
+              onError(`服务器错误: ${responseCode}`);
             }
-            if (httpRequest) {
-              httpRequest.destroy();
-            }
-            return;
-          }
-          
-          // HarmonyOS 会把所有流式数据缓存在 result 中
-          if (data.result && typeof data.result === 'string') {
-            console.info('[ChatService] 📦 从 result 中解析数据，长度:', data.result.length);
-            
-            try {
-              // 解析所有数据
-              const lines = data.result.split('\n');
-              
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const dataStr = line.substring(6).trim();
-                  
-                  if (dataStr === '[DONE]') {
-                    console.info('[ChatService] 解析完成 [DONE]');
-                    continue;
-                  }
-                  
-                  if (dataStr) {
-                    try {
-                      const chunk: StreamChunk = JSON.parse(dataStr);
-                      console.info('[ChatService] 解析 chunk:', chunk.type);
-                      onChunk(chunk);
-                    } catch (e) {
-                      console.error('[ChatService] 解析 chunk 失败:', e, 'Data:', dataStr);
-                    }
-                  }
-                }
-              }
-              
-              // 所有数据处理完成
-              if (!hasCompleted) {
-                hasCompleted = true;
-                console.info('[ChatService] 所有数据处理完成，调用 onComplete');
-                onComplete();
-              }
-            } catch (e) {
-              console.error('[ChatService] 解析 result 失败:', e);
-              if (!hasCompleted) {
-                hasCompleted = true;
-                onError('解析响应数据失败');
-              }
-            }
-            
-            if (httpRequest) {
-              httpRequest.destroy();
+            if (this.currentRequest) {
+              this.currentRequest.destroy();
+              this.currentRequest = null;
             }
           }
         }
       );
+      
     } catch (error) {
-      console.error('[ChatService] ❌ 发送消息异常:', error);
-      console.error('[ChatService] 异常详情:', JSON.stringify(error));
-      if (!hasCompleted) {
-        hasCompleted = true;
-        onError('发送消息失败: ' + error);
-      }
-      if (httpRequest) {
-        httpRequest.destroy();
+      console.error('[ChatService] 异常:', error);
+      onError('发送消息失败: ' + error);
+      if (this.currentRequest) {
+        this.currentRequest.destroy();
+        this.currentRequest = null;
       }
     }
-    console.info('=== ChatService.sendMessage 结束 ===');
   }
 
-  private arrayBufferToString(buffer: ArrayBuffer): string {
-    const uint8Array = new Uint8Array(buffer);
-    let result = '';
-    for (let i = 0; i < uint8Array.length; i++) {
-      result += String.fromCharCode(uint8Array[i]);
+  /**
+   * 停止当前请求
+   */
+  stopCurrentRequest(): void {
+    if (this.currentRequest) {
+      console.info('[ChatService] 停止当前请求');
+      this.currentRequest.destroy();
+      this.currentRequest = null;
     }
-    return result;
   }
+
+
 }
 
 export default new ChatService();

@@ -3,6 +3,6 @@
     "pages/Index",
     "pages/HomePage",
     "pages/ChatPage",
-    "pages/NetworkTestPage"
+    "pages/MainPage"
   ]
 }

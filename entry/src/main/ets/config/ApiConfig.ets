@@ -16,8 +16,7 @@ export class ApiConfig {
   // 开发环境配置
   static readonly DEV_CONFIG: DevConfig = {
     // 模拟器使用 10.0.2.2（模拟器访问宿主机的特殊地址）
-    // 如果 10.0.2.2 不通，尝试使用真实 IP: 192.168.148.49
-    EMULATOR_BASE_URL: 'http://192.168.148.49:3000',
+    EMULATOR_BASE_URL: 'http://10.0.2.2:3000',
     
     // 真机调试使用电脑 IP
     DEVICE_BASE_URL: 'http://192.168.148.49:3000',

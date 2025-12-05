@@ -1,12 +1,26 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/csc/.ohos/config/default_yishiting-hm_tare6DU_xCWpAxCCEOTf_qxhZWmBxNuCz4CbxC2vDw8=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BA5E540A4A02D18D7DF3F78BFCD67CB238D42FEE24F38D5DB77224F1F484FD14F6D2EB3B84E30D7",
+          "profile": "/Users/csc/.ohos/config/default_yishiting-hm_tare6DU_xCWpAxCCEOTf_qxhZWmBxNuCz4CbxC2vDw8=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/csc/.ohos/config/default_yishiting-hm_tare6DU_xCWpAxCCEOTf_qxhZWmBxNuCz4CbxC2vDw8=.p12",
+          "storePassword": "0000001BD6816B0E0F6B608AFC51F37795458428059622CB53EBA9317A98FE87DB85B7E18E436D3911BE64"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
         "signingConfig": "default",
         "targetSdkVersion": "6.0.1(21)",
-        "compatibleSdkVersion": "6.0.1(21)",
+        "compatibleSdkVersion": "5.0.0(12)",
         "runtimeOS": "HarmonyOS",
         "buildOption": {
           "strictMode": {

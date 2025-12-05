@@ -5,9 +5,9 @@ import { router } from '@kit.ArkUI';
 @Component
 struct Index {
   aboutToAppear() {
-    // 自动跳转到首页
+    // 自动跳转到主页面（带 Tab 导航）
     router.replaceUrl({
-      url: 'pages/HomePage'
+      url: 'pages/MainPage'
     });
   }
 
